@@ -48,9 +48,12 @@ function mentionsDeComptes(original, n, comptes) {
         const debut = m.index + m[1].length;
         const fin = debut + a.length;
         if (MOTS_COURANTS.has(a)) {
+          // Accepté écrit « CE », ou « Ce » / « Cé » en milieu de phrase (la dictée met une capitale aux noms),
+          // ou après « la », « compte », « carte » ; jamais « ce matin ».
           const ecrit = original.slice(debut, fin);
           const majuscules = ecrit === ecrit.toUpperCase() && /[A-Z]/.test(ecrit);
-          if (!majuscules && !/(^|\s)(la|compte|carte|ma|banque)\s+$/.test(n.slice(0, debut))) continue;
+          const capitale = /^[A-Z]/.test(ecrit) && debut > 0 && !/[.!?]\s*$/.test(original.slice(0, debut));
+          if (!majuscules && !capitale && !/(^|\s)(la|compte|carte|ma|banque)\s+$/.test(n.slice(0, debut))) continue;
         }
         if (trouvees.some((t) => debut < t.fin && fin > t.debut)) continue;
         trouvees.push({ compte: c.id, debut, fin });
@@ -61,16 +64,28 @@ function mentionsDeComptes(original, n, comptes) {
 }
 
 // Le montant : celui suivi de « € » ou « euros » d'abord, sinon le premier nombre qui n'est ni une date ni une heure.
+// La dictée écrit parfois « 12 euros 50 » ou « 12€50 » : les centimes après la devise comptent.
 function trouverMontant(n) {
-  const motif = /(^|[^\d/:,.])([+\-−]\s?)?(\d{1,3}(?:[  ]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?![\d/:])(\s?(?:€|eur\b|euros?\b))?/g;
+  const motif =
+    /(^|[^\d/:,.])([+\-−]\s?)?(\d{1,3}(?:[  ]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)(?![\d/:])(\s?(?:€|eur\b|euros?\b)(?:\s?(\d{2})(?![\d/:,.]|\s?h\d))?)?/g;
   const candidats = [];
   for (const m of n.matchAll(motif)) {
     const debut = m.index + m[1].length;
     const fin = m.index + m[0].length;
     if (!m[4] && (/^\s?h\d/.test(n.slice(fin)) || /\dh$/.test(n.slice(0, debut)))) continue; // « 12h30 »
-    candidats.push({ debut, fin, brut: `${m[2] || ''}${m[3]}`, devise: Boolean(m[4]), signe: (m[2] || '').trim() });
+    const centimes = m[5] && !/[.,]/.test(m[3]) ? `,${m[5]}` : '';
+    // Des centimes non retenus (le nombre en avait déjà) restent dans la phrase : on ne les retire pas.
+    const finRetenue = m[5] && !centimes ? fin - m[5].length : fin;
+    candidats.push({ debut, fin: finRetenue, brut: `${m[2] || ''}${m[3]}${centimes}`, devise: Boolean(m[4]), signe: (m[2] || '').trim() });
   }
   return candidats.find((c) => c.devise) || candidats[0] || null;
+}
+
+// Ce que la dictée écrit à sa façon : « C.E. » ou « C E » -> « CE ». Garde les autres caractères à leur place.
+function preparerDictee(texte) {
+  return texte
+    .replace(/(^|[\s(])([A-Z])\.\s?([A-Z])\.?(?=$|[\s,;:!?)])/g, '$1$2$3')
+    .replace(/(^|[\s(])([A-Z]) ([A-Z])(?=$|[\s,;:!?.)])/g, '$1$2$3');
 }
 
 function trouverDate(n, aujourdhui) {
@@ -95,11 +110,13 @@ function trouverDate(n, aujourdhui) {
 //    ou { ok: false, raison }
 export function lirePhrase(texte, comptes, { compteParDefaut, aujourdhui = dateLocale() } = {}) {
   // Sans émoji (deux unités UTF-16) : chaque caractère garde la même place dans la phrase normalisée.
-  const original = String(texte ?? '')
-    .replace(/[\u{10000}-\u{10FFFF}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200);
+  const original = preparerDictee(
+    String(texte ?? '')
+      .replace(/[\u{10000}-\u{10FFFF}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200)
+  );
   if (!original) return { ok: false, raison: 'Écris ou dicte une phrase, par exemple « débit 12,50 Carrefour ».' };
   const n = [...original].map((ch) => normaliser(ch)[0] ?? ch).join('');
   const montant = trouverMontant(n);

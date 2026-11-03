@@ -273,8 +273,11 @@ function construireSaisie() {
     autocapitalize: 'sentences',
     enterkeyhint: 'done',
   });
+  // Une dictée (Wispr Flow, micro du clavier) peut écrire sans événement « input » : « change », Entrée et
+  // le bouton Ajouter relisent aussi la phrase, mais seulement si elle a changé (une correction à la main reste).
   phrase.addEventListener('input', () => appliquerPhrase(false));
-  phrase.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), appliquerPhrase(true)));
+  phrase.addEventListener('change', () => phrase.value.trim() !== etat.phraseLue && appliquerPhrase(false));
+  phrase.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), validerSaisie()));
   const montant = h('input', { type: 'text', id: 'saisie-montant', inputmode: 'decimal', placeholder: '0,00', 'aria-label': 'Montant', autocomplete: 'off', enterkeyhint: 'next' });
   const libelle = h('input', { type: 'text', id: 'saisie-libelle', placeholder: 'Quoi ? (Carrefour, essence, loyer…)', 'aria-label': 'Libellé', maxlength: '80', autocomplete: 'off', enterkeyhint: 'done' });
   const date = h('input', { type: 'date', id: 'saisie-date', 'aria-label': 'Date' });
@@ -304,7 +307,7 @@ function construireSaisie() {
       h('span', { class: 'puces', id: 'puces-de' }),
       h('span', { class: 'quoi', id: 'quoi-vers' }, 'vers'),
       h('span', { class: 'puces', id: 'puces-vers' }),
-      h('button', { class: 'principal ajouter', onclick: ajouter }, icone('plus', 16), 'Ajouter')
+      h('button', { class: 'principal ajouter', onclick: validerSaisie }, icone('plus', 16), 'Ajouter')
     )
   );
 }
@@ -331,6 +334,14 @@ function exemplesPhrase() {
 
 const SENS_TEXTE = { depense: 'Dépense', rentree: 'Rentrée', virement: 'Virement' };
 
+// Entrée ou « Ajouter » : une phrase pas encore lue (dictée sans événement) est lue d'abord ; sinon on ajoute
+// ce que montrent les champs, corrections à la main comprises.
+function validerSaisie() {
+  const texte = $('#saisie-phrase')?.value.trim();
+  if (texte && texte !== etat.phraseLue) appliquerPhrase(true);
+  else ajouter();
+}
+
 function appliquerPhrase(valider) {
   const champ = $('#saisie-phrase');
   const apercu = $('#apercu-phrase');
@@ -344,11 +355,13 @@ function appliquerPhrase(valider) {
   const v = etat.vue;
   const r = lirePhrase(texte, v.comptes, { compteParDefaut: compteHabituel(), aujourdhui: v.aujourdhui });
   if (!r.ok) {
+    etat.phraseLue = '';
     apercu.textContent = r.raison;
     apercu.className = 'apercu-phrase attente';
     if (valider) toast(r.raison, true);
     return;
   }
+  etat.phraseLue = texte;
   etat.sens = r.sens;
   etat.compte = r.compte;
   if (r.vers) etat.vers = r.vers;
@@ -430,6 +443,7 @@ async function ajouter() {
   date.value = etat.vue.aujourdhui;
   const phrase = $('#saisie-phrase');
   if (phrase) phrase.value = '';
+  etat.phraseLue = '';
   if (etat.parPhrase) {
     // La phrase a choisi le compte et le sens pour cette fois seulement.
     etat.parPhrase = false;
