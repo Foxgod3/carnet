@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https://ntfy.sh; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e1116" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Mes comptes</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icones/icone-192.png" />
+    <link rel="apple-touch-icon" href="icones/icone-180.png" />
+    <link rel="stylesheet" href="ui/style.css" />
+  </head>
+  <body>
+    <main id="app"></main>
+    <div id="modale" class="fond" hidden></div>
+    <div id="toast" role="status" aria-live="polite"></div>
+  
+    <script type="module" src="mobile/transport.js"></script>
+    <script type="module" src="ui/app.js"></script>
+  </body>
+</html>
