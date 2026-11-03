@@ -20,6 +20,12 @@ const PEREMPTION_MS = 13 * 86_400_000; // le PC refuse une commande de plus de 1
 const ESSAIS = 5;
 const PAUSE_MS = 30_000;
 
+// Les mini-navigateurs intégrés (barre de recherche, lecteur de QR code…) n'ont pas toujours le chiffrement
+// du navigateur, ni leur propre stockage durable : l'appli doit tourner dans Chrome.
+const NAVIGATEUR_INCAPABLE = 'Ce navigateur ne peut pas ouvrir tes comptes : ouvre le lien dans Chrome';
+const navigateurCapable = () =>
+  Boolean(globalThis.isSecureContext && globalThis.crypto?.subtle && globalThis.CompressionStream && globalThis.DecompressionStream && globalThis.localStorage);
+
 const lireLocal = (cle) => {
   try {
     return JSON.parse(localStorage.getItem(cle) || 'null');
@@ -55,6 +61,7 @@ try {
   erreurJumelage = e.message;
 }
 if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+if (!navigateurCapable()) erreurJumelage = `${NAVIGATEUR_INCAPABLE}.`;
 
 // --- La vue, calculée avec la même logique que le PC -------------------------------------------
 
@@ -236,11 +243,14 @@ async function ouvrir(code) {
   if (!jumelage) return { erreur: "Ce téléphone n'est pas relié." };
   const reste = bloqueJusqua - Date.now();
   if (reste > 0) return { erreur: `Trop d'essais : réessaie dans ${Math.ceil(reste / 1000)} s.` };
+  if (!navigateurCapable()) return { erreur: NAVIGATEUR_INCAPABLE };
   try {
     const brute = await deballerCle(String(code || ''), jumelage.enveloppe);
     cle = await importerCle(brute);
     brute.fill(0);
-  } catch {
+  } catch (e) {
+    // Seul un échec du déchiffrement veut dire « mauvais code » ; le reste est un souci du navigateur.
+    if (e?.message !== 'Code incorrect.') return { erreur: `${NAVIGATEUR_INCAPABLE} (${e?.message || e})` };
     echecs += 1;
     if (echecs >= ESSAIS) {
       echecs = 0;

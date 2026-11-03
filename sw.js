@@ -1,7 +1,7 @@
 // Service worker de l'appli mobile : l'appli s'ouvre sans réseau et sans attendre (fichiers en cache),
 // et se met à jour toute seule quand une nouvelle version est publiée. Le relais (ntfy.sh) n'est jamais mis en cache.
 
-const VERSION = 'mc-f801a4525c4c';
+const VERSION = 'mc-83d1aabe9645';
 const FICHIERS = ["./","./ui/app.js","./ui/commun.js","./ui/icones.js","./ui/style.css","./ui/icone.png","./noyau/logique.js","./noyau/actions.js","./noyau/relais.js","./noyau/octets.js","./mobile/transport.js","./manifest.webmanifest","./icones/icone-180.png","./icones/icone-192.png","./icones/icone-512.png","./icones/icone-masquable-512.png","./index.html"];
 
 self.addEventListener('install', (e) => {
