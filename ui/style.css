@@ -515,6 +515,37 @@ a {
   display: none;
 }
 
+/* La phrase tapée ou dictée, qui remplit les champs en dessous. */
+.saisie .phrase {
+  margin-bottom: 12px;
+}
+
+.saisie .phrase input {
+  font-size: 15.5px;
+  padding: 11px 13px;
+}
+
+.apercu-phrase {
+  margin-top: 6px;
+  min-height: 1.35em;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--tres-doux);
+}
+
+.apercu-phrase.pret {
+  color: var(--texte);
+  font-weight: 550;
+}
+
+.apercu-phrase.pret.rentree {
+  color: var(--positif);
+}
+
+.apercu-phrase.attente {
+  color: var(--doux);
+}
+
 .saisie .haut {
   display: flex;
   gap: 6px;
@@ -1181,6 +1212,10 @@ details summary {
 
   .saisie .astuce {
     display: none;
+  }
+
+  .saisie .phrase input {
+    font-size: 16px;
   }
 
   .saisie .haut {

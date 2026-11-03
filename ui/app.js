@@ -27,6 +27,7 @@ import {
   champCode,
   icone,
 } from './commun.js';
+import { lirePhrase, aliasDuCompte } from '../noyau/phrase.js';
 
 const PC = api.plateforme === 'pc';
 // Les écrans propres au PC (banques, relevés, QR code…) ne sont chargés que sur le PC.
@@ -147,6 +148,8 @@ function rafraichirTableau() {
   remplacer('#heros', heros());
   remplacer('#comptes', v.comptes.map(carteCompte));
   rafraichirPuces();
+  // Une phrase en cours n'est pas relue à chaque mise à jour (elle écraserait une correction faite à la main).
+  if (!$('#saisie-phrase')?.value) appliquerPhrase(false);
   remplacer('#a-venir', listeAVenir());
   remplacer('#passees', listePassees());
 }
@@ -258,6 +261,20 @@ function filtrer(id) {
 // --- Saisie (dans la page sur le PC, en panneau sur le téléphone) ------------------------------
 
 function construireSaisie() {
+  // Une phrase tapée ou dictée (micro du clavier) remplit les champs ci-dessous ; Entrée ajoute.
+  const phrase = h('input', {
+    type: 'text',
+    id: 'saisie-phrase',
+    placeholder: 'En une phrase : « débit 12,50 Carrefour »',
+    'aria-label': 'Décris l’opération en une phrase',
+    'aria-describedby': 'apercu-phrase',
+    maxlength: '200',
+    autocomplete: 'off',
+    autocapitalize: 'sentences',
+    enterkeyhint: 'done',
+  });
+  phrase.addEventListener('input', () => appliquerPhrase(false));
+  phrase.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), appliquerPhrase(true)));
   const montant = h('input', { type: 'text', id: 'saisie-montant', inputmode: 'decimal', placeholder: '0,00', 'aria-label': 'Montant', autocomplete: 'off', enterkeyhint: 'next' });
   const libelle = h('input', { type: 'text', id: 'saisie-libelle', placeholder: 'Quoi ? (Carrefour, essence, loyer…)', 'aria-label': 'Libellé', maxlength: '80', autocomplete: 'off', enterkeyhint: 'done' });
   const date = h('input', { type: 'date', id: 'saisie-date', 'aria-label': 'Date' });
@@ -269,13 +286,15 @@ function construireSaisie() {
     ['rentree', 'Rentrée', 'Rentrée'],
     ['virement', 'Virement entre mes comptes', 'Virement'],
   ].map(([sens, long, court]) =>
-    h('button', { class: 'onglet', 'data-sens': sens, onclick: () => choisirSens(sens) }, h('span', { class: 'long' }, long), long === court ? null : h('span', { class: 'court' }, court))
+    // Un seul libellé quand le court et le long sont les mêmes (sinon le téléphone, qui cache le long, n'affiche rien).
+    h('button', { class: 'onglet', 'data-sens': sens, onclick: () => choisirSens(sens) }, long === court ? h('span', {}, long) : [h('span', { class: 'long' }, long), h('span', { class: 'court' }, court)])
   );
   return h(
     'section',
     { class: 'saisie', id: 'saisie', 'aria-label': 'Ajouter une opération' },
     h('div', { class: 'poignee' }),
     h('div', { class: 'titre-saisie' }, 'Nouvelle opération'),
+    h('div', { class: 'phrase' }, phrase, h('div', { class: 'apercu-phrase', id: 'apercu-phrase', 'aria-live': 'polite' })),
     h('div', { class: 'haut' }, onglets, h('span', { class: 'astuce' }, 'Entrée pour ajouter · compté tout de suite dans le disponible')),
     h('div', { class: 'champs' }, h('div', { class: 'montant' }, montant, h('span', {}, '€')), libelle, date),
     h(
@@ -292,7 +311,57 @@ function construireSaisie() {
 
 function ouvrirSaisie() {
   document.body.classList.add('saisie-ouverte');
-  setTimeout(() => $('#saisie-montant')?.focus(), 230);
+  setTimeout(() => $('#saisie-phrase')?.focus(), 230);
+}
+
+// Le compte retenu quand la phrase n'en cite aucun : celui choisi à la main la dernière fois.
+function compteHabituel() {
+  const garde = localStorage.getItem('mc.compte');
+  return compteDe(garde) ? garde : etat.vue.reglages?.compteParDefaut || etat.compte;
+}
+
+// Des exemples avec les initiales de tes propres comptes (« CE », « BP »…), tirées de leurs noms.
+function exemplesPhrase() {
+  const initiales = etat.vue.comptes
+    .map((c) => aliasDuCompte(c).find((a) => a.length >= 2 && a.length <= 3 && a !== c.nom.toLowerCase()) || c.nom)
+    .map((a) => (a.length <= 3 ? a.toUpperCase() : a));
+  const [a, b] = [initiales[1] || initiales[0], initiales[2] || initiales[0]];
+  return `Exemples : « débit 12,50 Carrefour ${a} » · « crédit 200 salaire ${b} » · « hier 8 € boulangerie » · « virement 50 de ${a} vers ${b} »`;
+}
+
+const SENS_TEXTE = { depense: 'Dépense', rentree: 'Rentrée', virement: 'Virement' };
+
+function appliquerPhrase(valider) {
+  const champ = $('#saisie-phrase');
+  const apercu = $('#apercu-phrase');
+  if (!champ || !apercu) return;
+  const texte = champ.value.trim();
+  if (!texte) {
+    apercu.textContent = exemplesPhrase();
+    apercu.className = 'apercu-phrase';
+    return;
+  }
+  const v = etat.vue;
+  const r = lirePhrase(texte, v.comptes, { compteParDefaut: compteHabituel(), aujourdhui: v.aujourdhui });
+  if (!r.ok) {
+    apercu.textContent = r.raison;
+    apercu.className = 'apercu-phrase attente';
+    if (valider) toast(r.raison, true);
+    return;
+  }
+  etat.sens = r.sens;
+  etat.compte = r.compte;
+  if (r.vers) etat.vers = r.vers;
+  $('#saisie-montant').value = r.montant;
+  $('#saisie-libelle').value = r.libelle;
+  $('#saisie-date').value = r.date;
+  etat.parPhrase = true;
+  rafraichirPuces();
+  const nom = (id) => compteDe(id)?.nom || id;
+  const ou = r.sens === 'virement' ? `${nom(r.compte)} → ${nom(r.vers)}` : `${nom(r.compte)}${r.compteCite ? '' : ' (compte habituel)'}`;
+  apercu.textContent = `${SENS_TEXTE[r.sens]} de ${r.montant} € · ${ou} · ${r.libelle || 'sans description'} · ${jourTitre(r.date)}${valider ? '' : ' — Entrée pour ajouter'}`;
+  apercu.className = `apercu-phrase pret ${r.sens}`;
+  if (valider) ajouter();
 }
 
 function fermerSaisie() {
@@ -359,8 +428,18 @@ async function ajouter() {
   montant.value = '';
   libelle.value = '';
   date.value = etat.vue.aujourdhui;
+  const phrase = $('#saisie-phrase');
+  if (phrase) phrase.value = '';
+  if (etat.parPhrase) {
+    // La phrase a choisi le compte et le sens pour cette fois seulement.
+    etat.parPhrase = false;
+    etat.compte = compteHabituel();
+    etat.sens = 'depense';
+    rafraichirPuces();
+  }
+  appliquerPhrase(false);
   if (document.body.classList.contains('saisie-ouverte')) fermerSaisie();
-  else montant.focus();
+  else (phrase || montant).focus();
 }
 
 // --- Listes, groupées par jour -----------------------------------------------------------------
