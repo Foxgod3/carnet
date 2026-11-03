@@ -24,6 +24,7 @@ import {
   fermerModale,
   pied,
   boutonIcone,
+  champCode,
   icone,
 } from './commun.js';
 
@@ -42,8 +43,10 @@ function ecranCode() {
   if (!PC && !v.existe) return ecranJumelage(v);
   const creation = PC && !v.existe;
   const erreur = h('div', { class: 'erreur', role: 'alert' });
-  const code = h('input', { type: 'password', placeholder: 'Code', autocomplete: 'off', 'aria-label': 'Code', inputmode: PC ? null : 'text' });
-  const confirmation = creation ? h('input', { type: 'password', placeholder: 'Le même code, encore', autocomplete: 'off', 'aria-label': 'Confirmation du code' }) : null;
+  const blocCode = champCode({ placeholder: 'Code', 'aria-label': 'Code' });
+  const blocConfirmation = creation ? champCode({ placeholder: 'Le même code, encore', 'aria-label': 'Confirmation du code' }) : null;
+  const code = blocCode.champ;
+  const confirmation = blocConfirmation?.champ;
   const bouton = h('button', { class: 'principal', type: 'submit' }, creation ? 'Créer mes comptes' : 'Ouvrir');
 
   async function envoyer(e) {
@@ -79,7 +82,7 @@ function ecranCode() {
       h('img', { class: 'logo', src: LOGO, alt: '' }),
       h('h1', {}, creation ? 'Bienvenue' : 'Mes comptes'),
       h('p', {}, texte),
-      h('form', { onsubmit: envoyer }, code, confirmation, bouton, erreur),
+      h('form', { onsubmit: envoyer }, blocCode, blocConfirmation, bouton, erreur),
       creation
         ? h('div', { class: 'note' }, 'Les comptes sont chiffrés avec ce code : sans lui, personne ne peut les relire, toi compris. Garde-le dans ton gestionnaire de mots de passe.')
         : null

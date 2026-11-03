@@ -144,6 +144,24 @@ export function pied(...boutons) {
   return h('div', { class: 'pied' }, gauche, h('button', { onclick: fermerModale }, 'Annuler'), droite);
 }
 
+// Champ de code avec un œil pour voir ce qu'on tape. Le clavier du téléphone ne corrige rien :
+// ni majuscule automatique, ni correction, ni apostrophe typographique.
+export function champCode(props = {}) {
+  const input = h('input', { type: 'password', autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false', ...props });
+  const oeil = h('button', { type: 'button', class: 'oeil discret', 'aria-label': 'Voir le code', title: 'Voir le code' }, icone('oeil', 18));
+  oeil.addEventListener('click', () => {
+    const visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    oeil.replaceChildren(icone(visible ? 'oeilBarre' : 'oeil', 18));
+    oeil.setAttribute('aria-label', visible ? 'Cacher le code' : 'Voir le code');
+    oeil.title = visible ? 'Cacher le code' : 'Voir le code';
+    input.focus();
+  });
+  const enveloppe = h('div', { class: 'champ-code' }, input, oeil);
+  enveloppe.champ = input;
+  return enveloppe;
+}
+
 export function boutonIcone(nomIcone, etiquette, onclick, classe = 'discret') {
   return h('button', { class: classe, title: etiquette, 'aria-label': etiquette, onclick }, icone(nomIcone), h('span', { class: 'etiquette-bouton' }, etiquette));
 }

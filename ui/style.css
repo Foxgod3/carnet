@@ -256,6 +256,26 @@ a {
   padding: 11px 13px;
 }
 
+.champ-code {
+  position: relative;
+}
+
+.champ-code input {
+  padding-right: 46px;
+}
+
+.champ-code .oeil {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px;
+}
+
+.champ-code .oeil:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
 .erreur {
   color: var(--negatif);
   min-height: 20px;
